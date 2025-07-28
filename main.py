@@ -7,7 +7,11 @@ import torch
 app = Flask(__name__)
 
 # Hugging Face modelini yükle
-generator = pipeline("text-generation", model="google/gemma-2b-it", torch_dtype=torch.bfloat16)
+hf_token = os.getenv("HUGGING_FACE_TOKEN")
+if not hf_token:
+    raise ValueError("Hugging Face token not found. Please set the HUGGING_FACE_TOKEN environment variable.")
+
+generator = pipeline("text-generation", model="google/gemma-2b-it", torch_dtype=torch.bfloat16, token=hf_token)
 
 @app.route('/')
 def index():
