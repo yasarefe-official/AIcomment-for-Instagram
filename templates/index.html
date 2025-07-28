@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram AI Comment Suggester</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
+        button { padding: 10px 15px; cursor: pointer; }
+        .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        .reply { background-color: #f0f8ff; padding: 5px; margin-top: 5px; border-left: 3px solid #add8e6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Instagram AI Comment Suggester</h1>
+        <form id="process-form">
+            <label for="username">Instagram Username:</label>
+            <input type="text" id="username" name="username" required>
+
+            <label for="password">Instagram Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <label for="shortcode">Instagram Video Shortcode:</label>
+            <input type="text" id="shortcode" name="shortcode" required>
+
+            <label for="system_prompt">System Prompt:</label>
+            <textarea id="system_prompt" name="system_prompt" rows="4" required></textarea>
+
+            <button type="submit" id="fetch-btn">Fetch & Generate Suggestions</button>
+        </form>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        document.getElementById('process-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const shortcode = document.getElementById('shortcode').value;
+            const system_prompt = document.getElementById('system_prompt').value;
+            const fetchBtn = document.getElementById('fetch-btn');
+            const resultsDiv = document.getElementById('results');
+
+            fetchBtn.disabled = true;
+            fetchBtn.textContent = 'Processing...';
+            resultsDiv.innerHTML = '';
+
+            const response = await fetch('/process_video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, shortcode, system_prompt })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            } else {
+                data.results.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'comment-item';
+                    div.innerHTML = `
+                        <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
+                        <div class="reply"><strong>Suggested Reply:</strong> ${item.suggested_reply}</div>
+                    `;
+                    resultsDiv.appendChild(div);
+                });
+            }
+
+            fetchBtn.disabled = false;
+            fetchBtn.textContent = 'Fetch & Generate Suggestions';
+        });
+    </script>
+</body>
+</html>
