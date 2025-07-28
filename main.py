@@ -1,6 +1,7 @@
 import os
 import tempfile
 import json
+import sys
 from flask import Flask, render_template, request, Response
 import instaloader
 import requests
@@ -45,7 +46,6 @@ def process_video():
     if 'session_file' not in request.files:
         return Response("Session file is required.", status=400)
 
-    # Form verilerini ve dosyayı al
     file = request.files['session_file']
     username = request.form.get('username')
     shortcode = request.form.get('shortcode')
@@ -54,30 +54,46 @@ def process_video():
     if not all([file, username, shortcode, user_system_prompt]):
         return Response("All fields and a session file are required.", status=400)
 
-    # Dosyayı geçici bir konuma kaydet
     temp_dir = tempfile.gettempdir()
     temp_filepath = os.path.join(temp_dir, secure_filename(file.filename))
     file.save(temp_filepath)
 
     def event_stream():
+        # Helper to print to stderr for Render logs
+        def log_to_stderr(message):
+            print(message, file=sys.stderr)
+
         try:
+            log_to_stderr("--- Starting event_stream ---")
             L = instaloader.Instaloader()
             L.load_session_from_file(username, temp_filepath)
+            log_to_stderr(f"Session loaded for user: {username}")
+
             post = instaloader.Post.from_shortcode(L.context, shortcode)
+            log_to_stderr(f"Post found with shortcode: {shortcode}")
 
             yield f"data: {json.dumps({'type': 'info', 'message': 'Fetching comments...'})}\n\n"
 
             comments = list(post.get_comments())
             total_comments = len(comments)
+            log_to_stderr(f"Found {total_comments} comments.") # **** ÖNEMLİ LOG ****
+
+            if total_comments == 0:
+                yield f"data: {json.dumps({'type': 'info', 'message': 'No comments found for this post.'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'message': 'Processing complete.'})}\n\n"
+                return
+
             yield f"data: {json.dumps({'type': 'status', 'total_comments': total_comments})}\n\n"
 
             generated_count = 0
             for i, comment in enumerate(comments):
+                log_to_stderr(f"Processing comment {i+1}/{total_comments}")
                 yield f"data: {json.dumps({'type': 'status', 'comments_fetched': i + 1})}\n\n"
 
                 try:
                     reply_text = generate_reply_with_google_api(user_system_prompt, comment.text)
                     generated_count += 1
+                    log_to_stderr(f"Generated reply for comment {i+1}")
 
                     result = {
                         'comment_text': comment.text,
@@ -87,15 +103,19 @@ def process_video():
                     yield f"data: {json.dumps({'type': 'new_reply', 'data': result, 'replies_generated': generated_count})}\n\n"
 
                 except Exception as api_error:
+                    log_to_stderr(f"API Error for comment {i+1}: {api_error}")
                     yield f"data: {json.dumps({'type': 'error', 'message': f'Could not process comment by {comment.owner.username}: {api_error}'})}\n\n"
 
+            log_to_stderr("--- Finished processing all comments ---")
             yield f"data: {json.dumps({'type': 'done', 'message': 'Processing complete.'})}\n\n"
 
         except Exception as e:
+            log_to_stderr(f"--- FATAL ERROR in event_stream: {e} ---")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
             if os.path.exists(temp_filepath):
                 os.remove(temp_filepath)
+                log_to_stderr("--- Temporary session file deleted ---")
 
     return Response(event_stream(), mimetype='text/event-stream')
 
