@@ -7,7 +7,7 @@
     <style>
         body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
         .container { max-width: 800px; margin: auto; }
-        input { width: 100%; padding: 8px; margin-bottom: 10px; }
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
         button { padding: 10px 15px; cursor: pointer; }
         .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
         .reply { background-color: #f0f8ff; padding: 10px; margin-top: 5px; border-left: 3px solid #add8e6; }
@@ -21,8 +21,8 @@
         <div class="info">
             <p><strong>How to use:</strong></p>
             <ol>
-                <li>Create a session file by running `instaloader --login=YOUR_USERNAME` on your computer.</li>
-                <li>Upload that session file (named after your username) below.</li>
+                <li>Create a session file using `instaloader --login=YOUR_USERNAME`.</li>
+                <li>Upload the session file, fill in the details, and provide a prompt for the AI's tone and style.</li>
             </ol>
         </div>
         <form id="process-form">
@@ -34,6 +34,9 @@
 
             <label for="shortcode">Instagram Video Shortcode:</label>
             <input type="text" id="shortcode" name="shortcode" required>
+
+            <label for="user_system_prompt">Tone & Style Prompt (e.g., "be funny and use emojis"):</label>
+            <textarea id="user_system_prompt" name="user_system_prompt" rows="3" required></textarea>
 
             <button type="submit" id="fetch-btn">Fetch & Generate Replies</button>
         </form>
