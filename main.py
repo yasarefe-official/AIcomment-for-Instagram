@@ -10,7 +10,7 @@ def generate_reply_with_google_api(system_prompt, comment_text):
     if not api_key:
         raise ValueError("Google API key not found. Please set the GOOGLE_API_KEY environment variable.")
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-2b-it:generateContent"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-1b-it:generateContent"
     headers = {
         'Content-Type': 'application/json',
         'X-goog-api-key': api_key
