@@ -15,9 +15,15 @@ def generate_reply_with_google_api(comment_text):
     if not api_key:
         raise ValueError("Google API key not found.")
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-2b-it:generateContent"
-    headers = {'Content-Type': 'application/json', 'X-goog-api-key': api_key}
-    prompt_text = f"{SYSTEM_PROMPT}\n###\nComment: \"{comment_text}\"\n###\nReply:"
+
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-1b-it:generateContent"
+    headers = {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': api_key
+    }
+
+    prompt_text = f"{system_prompt}\n###\nComment: \"{comment_text}\"\n###\nReply:"
+
     data = {
         "contents": [{"parts": [{"text": prompt_text}]}],
         "generationConfig": {"maxOutputTokens": 40} # Kelime sayısı için token'ı biraz daha yüksek tutalım
