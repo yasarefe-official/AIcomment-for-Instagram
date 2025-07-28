@@ -3,27 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Comment Replier</title>
+    <title>Instagram AI Comment Suggester</title>
     <style>
         body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
         .container { max-width: 800px; margin: auto; }
-        textarea, input { width: 100%; padding: 8px; margin-bottom: 10px; }
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
         button { padding: 10px 15px; cursor: pointer; }
         .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-        .status { margin-left: 10px; }
+        .reply { background-color: #f0f8ff; padding: 5px; margin-top: 5px; border-left: 3px solid #add8e6; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Instagram Comment Replier</h1>
+        <h1>Instagram AI Comment Suggester</h1>
         <form id="process-form">
+            <label for="username">Instagram Username:</label>
+            <input type="text" id="username" name="username" required>
+
+            <label for="password">Instagram Password:</label>
+            <input type="password" id="password" name="password" required>
+
             <label for="shortcode">Instagram Video Shortcode:</label>
             <input type="text" id="shortcode" name="shortcode" required>
 
             <label for="system_prompt">System Prompt:</label>
             <textarea id="system_prompt" name="system_prompt" rows="4" required></textarea>
 
-            <button type="submit" id="fetch-btn">Fetch & Generate Replies</button>
+            <button type="submit" id="fetch-btn">Fetch & Generate Suggestions</button>
         </form>
 
         <div id="results"></div>
@@ -32,6 +38,8 @@
     <script>
         document.getElementById('process-form').addEventListener('submit', async function(e) {
             e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
             const shortcode = document.getElementById('shortcode').value;
             const system_prompt = document.getElementById('system_prompt').value;
             const fetchBtn = document.getElementById('fetch-btn');
@@ -44,7 +52,7 @@
             const response = await fetch('/process_video', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shortcode, system_prompt })
+                body: JSON.stringify({ username, password, shortcode, system_prompt })
             });
 
             const data = await response.json();
@@ -56,46 +64,15 @@
                     const div = document.createElement('div');
                     div.className = 'comment-item';
                     div.innerHTML = `
-                        <p><strong>Comment:</strong> ${item.comment_text}</p>
-                        <p><strong>Suggested Reply:</strong> <span class="reply-text">${item.suggested_reply}</span></p>
-                        <button class="reply-btn" data-comment-id="${item.comment_id}">Reply</button>
-                        <span class="status"></span>
+                        <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
+                        <div class="reply"><strong>Suggested Reply:</strong> ${item.suggested_reply}</div>
                     `;
                     resultsDiv.appendChild(div);
                 });
             }
 
             fetchBtn.disabled = false;
-            fetchBtn.textContent = 'Fetch & Generate Replies';
-        });
-
-        document.getElementById('results').addEventListener('click', async function(e) {
-            if (e.target.classList.contains('reply-btn')) {
-                const button = e.target;
-                const commentId = button.dataset.commentId;
-                const replyText = button.closest('.comment-item').querySelector('.reply-text').textContent;
-                const statusSpan = button.nextElementSibling;
-
-                button.disabled = true;
-                statusSpan.textContent = 'Sending...';
-
-                const response = await fetch('/reply', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ comment_id: commentId, reply_text: replyText })
-                });
-
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    statusSpan.textContent = 'Sent!';
-                    statusSpan.style.color = 'green';
-                } else {
-                    statusSpan.textContent = `Error: ${data.message}`;
-                    statusSpan.style.color = 'red';
-                    button.disabled = false;
-                }
-            }
+            fetchBtn.textContent = 'Fetch & Generate Suggestions';
         });
     </script>
 </body>
