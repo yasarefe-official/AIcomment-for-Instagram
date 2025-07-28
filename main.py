@@ -7,26 +7,30 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Sabit sistem prompt'u. UI'dan alınmayacak.
-SYSTEM_PROMPT = "You are a helpful assistant. Generate a friendly and concise reply to the following comment. The reply must be a maximum of 30 words."
+# 1. Sunucu Tarafındaki Sistem Prompt (Ana prompt) - Değiştirilemez
+MAIN_SYSTEM_PROMPT = "You are a helpful social media assistant. Your goal is to generate a friendly and concise reply to the following comment. The reply must be a maximum of 30 words and must adhere to the user's instructions."
 
-def generate_reply_with_google_api(comment_text):
+def generate_reply_with_google_api(user_system_prompt, comment_text):
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError("Google API key not found.")
 
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-2b-it:generateContent"
+    headers = {'Content-Type': 'application/json', 'X-goog-api-key': api_key}
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-1b-it:generateContent"
-    headers = {
-        'Content-Type': 'application/json',
-        'X-goog-api-key': api_key
-    }
-
-    prompt_text = f"{system_prompt}\n###\nComment: \"{comment_text}\"\n###\nReply:"
+    # Ana ve Alt prompt'ları birleştir
+    final_prompt = (
+        f"{MAIN_SYSTEM_PROMPT}\n\n"
+        f"User's instructions for tone and style: '{user_system_prompt}'\n\n"
+        f"###\n"
+        f"Comment: \"{comment_text}\"\n"
+        f"###\n"
+        f"Reply:"
+    )
 
     data = {
-        "contents": [{"parts": [{"text": prompt_text}]}],
-        "generationConfig": {"maxOutputTokens": 40} # Kelime sayısı için token'ı biraz daha yüksek tutalım
+        "contents": [{"parts": [{"text": final_prompt}]}],
+        "generationConfig": {"maxOutputTokens": 40}
     }
 
     response = requests.post(url, headers=headers, json=data)
@@ -49,9 +53,10 @@ def process_video():
     file = request.files['session_file']
     username = request.form.get('username')
     shortcode = request.form.get('shortcode')
+    user_system_prompt = request.form.get('user_system_prompt') # 2. Kullanıcı Tarafındaki Sistem Prompt
 
-    if not all([file, username, shortcode]):
-        return jsonify({'error': 'Username, shortcode, and a session file are required.'}), 400
+    if not all([file, username, shortcode, user_system_prompt]):
+        return jsonify({'error': 'All fields and a session file are required.'}), 400
 
     temp_dir = tempfile.gettempdir()
     temp_filepath = os.path.join(temp_dir, secure_filename(file.filename))
@@ -66,7 +71,7 @@ def process_video():
 
         results = []
         for comment in comments:
-            reply_text = generate_reply_with_google_api(comment.text)
+            reply_text = generate_reply_with_google_api(user_system_prompt, comment.text)
 
             results.append({
                 'comment_id': comment.id,
