@@ -1,17 +1,52 @@
 import os
 from flask import Flask, render_template, request, jsonify
 import instaloader
-from transformers import pipeline
-import torch
+import requests
 
 app = Flask(__name__)
 
-# Hugging Face modelini yükle
-hf_token = os.getenv("HUGGING_FACE_TOKEN")
-if not hf_token:
-    raise ValueError("Hugging Face token not found. Please set the HUGGING_FACE_TOKEN environment variable.")
+def generate_reply_with_google_api(system_prompt, comment_text):
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("Google API key not found. Please set the GOOGLE_API_KEY environment variable.")
 
-generator = pipeline("text-generation", model="google/gemma-2b-it", torch_dtype=torch.bfloat16, token=hf_token)
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-2b-it:generateContent"
+    headers = {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': api_key
+    }
+
+    # Google API'sinin beklediği format ile prompt'u birleştiriyoruz.
+    # Sistemin rolünü ve kullanıcı girdisini ayrı ayrı belirtmek genellikle daha iyi sonuç verir.
+    prompt_text = f"{system_prompt}\n###\nComment: \"{comment_text}\"\n###\nReply:"
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt_text
+                    }
+                ]
+            }
+        ],
+        "generationConfig": {
+            "maxOutputTokens": 30
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status() # Hata durumunda exception fırlat
+
+    # API cevabından metni ayıkla
+    # Cevap formatı: response.json()['candidates'][0]['content']['parts'][0]['text']
+    try:
+        return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+    except (KeyError, IndexError) as e:
+        # API'den beklenen format gelmezse, hatayı logla veya bir varsayılan döndür
+        print(f"Error parsing Google API response: {e}")
+        return "Sorry, I couldn't generate a reply."
+
 
 @app.route('/')
 def index():
@@ -37,9 +72,7 @@ def process_video():
 
         results = []
         for comment in comments:
-            prompt = f"{system_prompt}\n###\nComment: \"{comment.text}\"\n###\nReply:"
-            outputs = generator(prompt, max_new_tokens=30, num_return_sequences=1)
-            reply_text = outputs[0]['generated_text'].split("Reply:")[1].strip()
+            reply_text = generate_reply_with_google_api(system_prompt, comment.text)
 
             results.append({
                 'comment_text': comment.text,

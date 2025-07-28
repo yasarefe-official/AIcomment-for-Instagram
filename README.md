@@ -1,20 +1,20 @@
-# Instagram AI Comment Suggester
+# Instagram AI Comment Suggester (Google API Edition)
 
-This is a Flask-based web application that uses your Instagram credentials to fetch comments from a video post and then generates reply suggestions using a Hugging Face AI model.
+This is a lightweight Flask-based web application that uses your Instagram credentials to fetch comments from a video post and then generates reply suggestions using the Google Generative Language API.
 
-**Important:** The `google/gemma-2b-it` model is a gated model and requires a Hugging Face access token.
+This version is optimized for low-memory environments like Render.com's free tier, as it does not load heavy models locally.
 
 ## How it works
 
 1.  **User Input**: The user provides their Instagram username, password, the shortcode of the video post, and a system prompt to guide the AI's tone and style.
 2.  **Login & Fetch**: The application uses `instaloader` to log in to Instagram with the provided credentials and fetches all comments from the specified video.
-3.  **Generate AI Suggestions**: For each comment, a prompt is sent to the Hugging Face Gemma model (`google/gemma-2b-it`) to generate a reply suggestion based on the user's system prompt. This requires a Hugging Face token.
+3.  **Generate AI Suggestions**: For each comment, a request is sent to the Google Generative Language API (with the Gemma model) to generate a reply suggestion. This requires a Google API Key.
 4.  **Display Results**: The web UI lists each comment along with its AI-generated reply suggestion.
 
 ## App Structure
 
 *   `/`: GET - Displays the HTML form for user input.
-*   `/process_video`: POST - Logs in, fetches comments, generates suggestions, and returns them as a JSON response.
+*   `/process_video`: POST - Logs in, fetches comments, generates suggestions via API, and returns them as a JSON response.
 
 ## How to Use
 
@@ -34,9 +34,9 @@ This is a Flask-based web application that uses your Instagram credentials to fe
     ```bash
     cp .env.example .env
     ```
-    Open the `.env` file and add your Hugging Face access token. You can get one from [your Hugging Face profile settings](https://huggingface.co/settings/tokens).
+    Open the `.env` file and add your Google API Key. You can get one from the [Google AI Studio](https://aistudio.google.com/app/apikey).
     ```
-    HUGGING_FACE_TOKEN=your_hugging_face_token_here
+    GOOGLE_API_KEY=your_google_api_key_here
     ```
 4.  **Run the application**:
     ```bash
@@ -49,6 +49,6 @@ This is a Flask-based web application that uses your Instagram credentials to fe
 2.  Set the build command to `pip install -r requirements.txt`.
 3.  Set the start command to `gunicorn main:app`.
 4.  In the Render.com dashboard, go to "Environment" and add a new environment variable:
-    *   **Key**: `HUGGING_FACE_TOKEN`
-    *   **Value**: `your_hugging_face_token_here`
-5.  Be aware of the security implications of handling credentials directly in the application. It is generally recommended for local use.
+    *   **Key**: `GOOGLE_API_KEY`
+    *   **Value**: `your_google_api_key_here`
+5.  This lightweight version should deploy smoothly on Render's free tier.
