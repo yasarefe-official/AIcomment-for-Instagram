@@ -1,14 +1,14 @@
-# Real-Time Instagram AI Suggester
+# Instagram AI Comment Suggester
 
-This is a dynamic web application that fetches Instagram comments and generates AI-powered reply suggestions, showing the entire process to the user in real-time.
+This is a web application that fetches Instagram comments and generates AI-powered reply suggestions.
 
 ## Core Features
 
--   **Real-Time Progress**: The UI updates live as comments are fetched and replies are generated, using Server-Sent Events (SSE) for a dynamic user experience.
 -   **Hierarchical Prompts**: A two-level prompt system provides both robust control and user flexibility.
     1.  **Main System Prompt (Backend)**: Defines the core rules for the AI (e.g., "be a helpful assistant, max 30 words").
     2.  **User System Prompt (Frontend)**: Allows the user to specify the tone and style for each batch (e.g., "be funny and use emojis").
 -   **Secure Session Handling**: Avoids checkpoint errors by using a session file created locally by the user and uploaded securely via the browser. The file is deleted from the server immediately after use.
+-   **AI-Powered Suggestions**: Generates replies using Google's Gemma model via their API.
 -   **Lightweight & Deployable**: Optimized for low-memory environments like Render.com's free tier.
 
 ## How to Use
@@ -44,4 +44,4 @@ You need a Google API key to generate AI suggestions.
 1.  Open the application in your browser.
 2.  Enter your Instagram username and upload the session file.
 3.  Enter the video shortcode and a "Tone & Style Prompt".
-4.  Click "Fetch & Generate in Real-Time" and watch the magic happen!
+4.  Click "Fetch & Generate Suggestions" and wait for the results to appear.

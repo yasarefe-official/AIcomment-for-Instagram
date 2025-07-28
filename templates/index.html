@@ -3,28 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Instagram AI Suggester</title>
+    <title>Instagram AI Comment Suggester</title>
     <style>
         body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
         .container { max-width: 800px; margin: auto; }
         input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
         button { padding: 10px 15px; cursor: pointer; }
-        .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; opacity: 0; animation: fadeIn 0.5s forwards; }
+        .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
         .reply { background-color: #f0f8ff; padding: 10px; margin-top: 5px; border-left: 3px solid #add8e6; }
         .info { background-color: #eee; padding: 10px; margin-bottom: 15px; border-radius: 5px; }
-        .status-bar { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; text-align: center; }
-        @keyframes fadeIn { to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Real-Time Instagram AI Suggester</h1>
+        <h1>Instagram AI Comment Suggester</h1>
         <div class="info">
             <p><strong>How to use:</strong></p>
             <ol>
                 <li>Create a session file using `instaloader --login=YOUR_USERNAME`.</li>
                 <li>Upload the session file and fill in the details below.</li>
-                <li>Watch the progress in real-time!</li>
             </ol>
         </div>
         <form id="process-form">
@@ -40,139 +37,55 @@
             <label for="user_system_prompt">Tone & Style Prompt:</label>
             <textarea id="user_system_prompt" name="user_system_prompt" rows="3" required></textarea>
 
-            <button type="submit" id="fetch-btn">Fetch & Generate in Real-Time</button>
+            <button type="submit" id="fetch-btn">Fetch & Generate Suggestions</button>
         </form>
-
-        <div id="status-bar" style="display: none;">
-            <h3 id="status-message">Starting...</h3>
-            <p>
-                <span id="comments-fetched">0</span>/<span id="total-comments">?</span> Comments Fetched |
-                <span id="replies-generated">0</span>/<span id="total-comments-2">?</span> Replies Generated
-            </p>
-        </div>
 
         <div id="results"></div>
     </div>
 
     <script>
-        document.getElementById('process-form').addEventListener('submit', function(e) {
+        document.getElementById('process-form').addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const fetchBtn = document.getElementById('fetch-btn');
             const resultsDiv = document.getElementById('results');
-            const statusBar = document.getElementById('status-bar');
-            const statusMessage = document.getElementById('status-message');
-            const commentsFetchedSpan = document.getElementById('comments-fetched');
-            const totalCommentsSpan = document.getElementById('total-comments');
-            const repliesGeneratedSpan = document.getElementById('replies-generated');
-            const totalComments2Span = document.getElementById('total-comments-2');
             const formData = new FormData(e.target);
 
             fetchBtn.disabled = true;
+            fetchBtn.textContent = 'Processing...';
             resultsDiv.innerHTML = '';
-            statusBar.style.display = 'block';
-            statusMessage.textContent = 'Connecting...';
-            commentsFetchedSpan.textContent = '0';
-            totalCommentsSpan.textContent = '?';
-            repliesGeneratedSpan.textContent = '0';
-            totalComments2Span.textContent = '?';
 
-            const eventSource = new EventSource('/process_video', {
-                method: 'POST', // NOTE: EventSource does not support POST directly. This is a workaround.
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // Not standard but helps some servers.
-                body: new URLSearchParams(formData) // This is also not standard. The real solution is to pass params in URL.
-            });
+            try {
+                const response = await fetch('/process_video', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            // A more robust solution would pass params in the URL for a GET request,
-            // but since we need to upload a file, we'll stick to a fetch-based POST
-            // that returns a stream. Let's adjust the logic to handle the stream.
-            // The above EventSource is conceptually what we want, but let's implement it with fetch.
+                const data = await response.json();
 
-            fetch('/process_video', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-
-                function push() {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            statusMessage.textContent = 'Processing Complete!';
-                            fetchBtn.disabled = false;
-                            return;
-                        }
-
-                        // The value is a Uint8Array, decode it to a string.
-                        // SSE messages are separated by \n\n.
-                        const chunk = decoder.decode(value, { stream: true });
-                        const events = chunk.split('\n\n');
-
-                        events.forEach(event => {
-                            if (event.startsWith('data:')) {
-                                const jsonData = event.substring(5);
-                                if(jsonData.trim() === "") return;
-                                try {
-                                    const data = JSON.parse(jsonData);
-                                    handleServerEvent(data);
-                                } catch (err) {
-                                    console.error("Failed to parse JSON:", jsonData, err);
-                                }
-                            }
-                        });
-
-                        push();
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                } else if (data.results.length === 0) {
+                    resultsDiv.innerHTML = `<p>${data.message || 'No results found.'}</p>`;
+                }
+                else {
+                    data.results.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'comment-item';
+                        div.innerHTML = `
+                            <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
+                            <div class="reply"><strong>Suggested Reply:</strong> ${item.suggested_reply}</div>
+                        `;
+                        resultsDiv.appendChild(div);
                     });
                 }
-                push();
-            })
-            .catch(err => {
-                statusMessage.textContent = `Connection Error: ${err.message}`;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: red;">An unexpected error occurred: ${error.message}</p>`;
+            } finally {
                 fetchBtn.disabled = false;
-            });
-        });
-
-        function handleServerEvent(data) {
-            const statusMessage = document.getElementById('status-message');
-            const commentsFetchedSpan = document.getElementById('comments-fetched');
-            const totalCommentsSpan = document.getElementById('total-comments');
-            const repliesGeneratedSpan = document.getElementById('replies-generated');
-            const totalComments2Span = document.getElementById('total-comments-2');
-
-            switch(data.type) {
-                case 'info':
-                    statusMessage.textContent = data.message;
-                    break;
-                case 'status':
-                    if(data.total_comments) {
-                        totalCommentsSpan.textContent = data.total_comments;
-                        totalComments2Span.textContent = data.total_comments;
-                    }
-                    if(data.comments_fetched) {
-                        commentsFetchedSpan.textContent = data.comments_fetched;
-                    }
-                    break;
-                case 'new_reply':
-                    repliesGeneratedSpan.textContent = data.replies_generated;
-                    const div = document.createElement('div');
-                    div.className = 'comment-item';
-                    div.innerHTML = `
-                        <p><strong>${data.data.owner}:</strong> ${data.data.comment_text}</p>
-                        <div class="reply"><strong>Suggested Reply:</strong> ${data.data.suggested_reply}</div>
-                    `;
-                    document.getElementById('results').appendChild(div);
-                    break;
-                case 'error':
-                    statusMessage.textContent = `Error: ${data.message}`;
-                    statusMessage.style.color = 'red';
-                    break;
-                case 'done':
-                     statusMessage.textContent = data.message;
-                     document.getElementById('fetch-btn').disabled = false;
-                     break;
+                fetchBtn.textContent = 'Fetch & Generate Suggestions';
             }
-        }
+        });
     </script>
 </body>
 </html>
