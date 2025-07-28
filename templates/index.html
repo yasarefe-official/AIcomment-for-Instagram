@@ -16,12 +16,10 @@
 <body>
     <div class="container">
         <h1>Instagram AI Comment Suggester</h1>
+        <p><strong>Important:</strong> You must first create a session file using `create_session.py` and place it in the application's root directory.</p>
         <form id="process-form">
             <label for="username">Instagram Username:</label>
             <input type="text" id="username" name="username" required>
-
-            <label for="password">Instagram Password:</label>
-            <input type="password" id="password" name="password" required>
 
             <label for="shortcode">Instagram Video Shortcode:</label>
             <input type="text" id="shortcode" name="shortcode" required>
@@ -39,7 +37,6 @@
         document.getElementById('process-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
             const shortcode = document.getElementById('shortcode').value;
             const system_prompt = document.getElementById('system_prompt').value;
             const fetchBtn = document.getElementById('fetch-btn');
@@ -52,7 +49,7 @@
             const response = await fetch('/process_video', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, shortcode, system_prompt })
+                body: JSON.stringify({ username, shortcode, system_prompt })
             });
 
             const data = await response.json();
