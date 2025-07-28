@@ -1,7 +1,9 @@
 import os
+import tempfile
 from flask import Flask, render_template, request, jsonify
 import instaloader
 import requests
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -19,18 +21,8 @@ def generate_reply_with_google_api(system_prompt, comment_text):
     prompt_text = f"{system_prompt}\n###\nComment: \"{comment_text}\"\n###\nReply:"
 
     data = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt_text
-                    }
-                ]
-            }
-        ],
-        "generationConfig": {
-            "maxOutputTokens": 30
-        }
+        "contents": [{"parts": [{"text": prompt_text}]}],
+        "generationConfig": {"maxOutputTokens": 30}
     }
 
     response = requests.post(url, headers=headers, json=data)
@@ -48,23 +40,33 @@ def index():
 
 @app.route('/process_video', methods=['POST'])
 def process_video():
-    data = request.json
-    username = data.get('username')
-    shortcode = data.get('shortcode')
-    system_prompt = data.get('system_prompt')
+    if 'session_file' not in request.files:
+        return jsonify({'error': 'No session file part in the request.'}), 400
 
-    if not all([username, shortcode, system_prompt]):
-        return jsonify({'error': 'Username, shortcode, and system prompt are required.'}), 400
+    file = request.files['session_file']
+    username = request.form.get('username')
+    shortcode = request.form.get('shortcode')
+    system_prompt = request.form.get('system_prompt')
+
+    if not all([file, username, shortcode, system_prompt]):
+        return jsonify({'error': 'All fields and a session file are required.'}), 400
+
+    if file.filename == '':
+        return jsonify({'error': 'No selected file.'}), 400
+
+    # Güvenli bir şekilde geçici bir dosyaya kaydet
+    temp_dir = tempfile.gettempdir()
+    # Dosya adının, instaloader'ın beklediği gibi kullanıcı adıyla eşleşmesi önemli olabilir.
+    # Ancak load_session_from_file(username, filepath) kullandığımız için bu zorunlu değil.
+    # Yine de karışıklığı önlemek için güvenli bir ad kullanalım.
+    filename = secure_filename(file.filename)
+    temp_filepath = os.path.join(temp_dir, filename)
+
+    file.save(temp_filepath)
 
     try:
         L = instaloader.Instaloader()
-
-        # Checkpoint sorununu önlemek için şifreyle giriş yapmak yerine session dosyasını kullan
-        session_file = f"./{username}"
-        if not os.path.exists(session_file):
-            return jsonify({'error': f'Session file not found for user {username}. Please create it first.'}), 400
-
-        L.load_session_from_file(username, session_file)
+        L.load_session_from_file(username, temp_filepath)
 
         post = instaloader.Post.from_shortcode(L.context, shortcode)
         comments = list(post.get_comments())
@@ -83,6 +85,10 @@ def process_video():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        # İşlem bittiğinde geçici dosyayı sil
+        if os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

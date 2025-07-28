@@ -11,15 +11,25 @@
         button { padding: 10px 15px; cursor: pointer; }
         .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
         .reply { background-color: #f0f8ff; padding: 5px; margin-top: 5px; border-left: 3px solid #add8e6; }
+        .info { background-color: #eee; padding: 10px; margin-bottom: 15px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Instagram AI Comment Suggester</h1>
-        <p><strong>Important:</strong> You must first create a session file using `create_session.py` and place it in the application's root directory.</p>
+        <div class="info">
+            <p><strong>How to use:</strong></p>
+            <ol>
+                <li>Run the `create_session.py` script on your computer to generate a session file.</li>
+                <li>Upload that session file below.</li>
+            </ol>
+        </div>
         <form id="process-form">
             <label for="username">Instagram Username:</label>
             <input type="text" id="username" name="username" required>
+
+            <label for="session_file">Instagram Session File:</label>
+            <input type="file" id="session_file" name="session_file" required>
 
             <label for="shortcode">Instagram Video Shortcode:</label>
             <input type="text" id="shortcode" name="shortcode" required>
@@ -36,40 +46,44 @@
     <script>
         document.getElementById('process-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const username = document.getElementById('username').value;
-            const shortcode = document.getElementById('shortcode').value;
-            const system_prompt = document.getElementById('system_prompt').value;
+
             const fetchBtn = document.getElementById('fetch-btn');
             const resultsDiv = document.getElementById('results');
+            const form = e.target;
+
+            const formData = new FormData(form);
 
             fetchBtn.disabled = true;
             fetchBtn.textContent = 'Processing...';
             resultsDiv.innerHTML = '';
 
-            const response = await fetch('/process_video', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, shortcode, system_prompt })
-            });
-
-            const data = await response.json();
-
-            if (data.error) {
-                resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
-            } else {
-                data.results.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'comment-item';
-                    div.innerHTML = `
-                        <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
-                        <div class="reply"><strong>Suggested Reply:</strong> ${item.suggested_reply}</div>
-                    `;
-                    resultsDiv.appendChild(div);
+            try {
+                const response = await fetch('/process_video', {
+                    method: 'POST',
+                    body: formData // No 'Content-Type' header needed, browser sets it for FormData
                 });
-            }
 
-            fetchBtn.disabled = false;
-            fetchBtn.textContent = 'Fetch & Generate Suggestions';
+                const data = await response.json();
+
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                } else {
+                    data.results.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'comment-item';
+                        div.innerHTML = `
+                            <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
+                            <div class="reply"><strong>Suggested Reply:</strong> ${item.suggested_reply}</div>
+                        `;
+                        resultsDiv.appendChild(div);
+                    });
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: red;">An unexpected error occurred: ${error.message}</p>`;
+            } finally {
+                fetchBtn.disabled = false;
+                fetchBtn.textContent = 'Fetch & Generate Suggestions';
+            }
         });
     </script>
 </body>
