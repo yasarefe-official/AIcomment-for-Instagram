@@ -1,49 +1,48 @@
-# Instagram AI Comment Suggester (Secure Session Upload)
+# Instagram AI Comment Replier (Final Version)
 
-This is a lightweight Flask-based web application that uses a user-uploaded `instaloader` session to fetch comments from a video post and then generates reply suggestions using the Google Generative Language API.
+This is a lightweight Flask-based web application that uses a user-uploaded `instaloader` session to fetch comments, generates reply suggestions with the Google Generative Language API, and allows the user to post the reply directly to Instagram using the Meta Graph API.
 
-This version uses a secure method where the session file is uploaded directly through the browser and is never stored permanently on the server or in a git repository.
+## Features
+
+-   **Secure Session Handling**: Uses a session file created locally by the user and uploaded via the browser. The file is deleted from the server immediately after use.
+-   **AI-Powered Suggestions**: Generates replies using Google's Gemma model via their API.
+-   **One-Click Replies**: Allows posting the suggested reply to Instagram with a single button click.
+-   **Lightweight**: Optimized for low-memory environments like Render.com's free tier.
 
 ## How it works
 
-1.  **Create Session (One-time setup on your computer):** The user runs a local script (`create_session.py`) to log in to Instagram. This creates a session file on their computer.
-2.  **Upload Session & Provide Info**: In the web app, the user provides their Instagram username, the video shortcode, a system prompt for the AI, and uploads the session file created in the first step.
-3.  **Load Session & Fetch**: The application backend receives the session file, loads it into `instaloader`, and immediately fetches the comments. The session file is deleted from the server right after use.
-4.  **Generate AI Suggestions**: For each comment, a request is sent to the Google Generative Language API.
-5.  **Display Results**: The web UI lists each comment along with its AI-generated reply suggestion.
+1.  **Create Session (One-time setup):** The user runs `instaloader --login=YOUR_USERNAME` on their computer to create a session file.
+2.  **Upload & Fetch**: In the web app, the user uploads their session file and provides their username and the video shortcode. The app loads the session to fetch comments.
+3.  **Generate Suggestions**: The app sends each comment to the Google API to get a reply suggestion based on a fixed system prompt within the code.
+4.  **Review & Reply**: The user reviews the suggestions. If they like a suggestion, they click the "Reply" button.
+5.  **Post Reply**: The app sends a request to the Meta Graph API to post the text as a reply to the specific comment on Instagram.
 
 ## How to Use
 
 ### Step 1: Create Your Instagram Session File
 
-You must do this once on your local machine.
+On your local computer, run the following command in your terminal. You need to have `instaloader` installed (`pip install instaloader`).
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/your-username/instagram-ai-comment-suggester.git
-    cd instagram-ai-comment-suggester
-    ```
-2.  **Install dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  **Run the session creation script**:
-    ```bash
-    python create_session.py
-    ```
-    Enter your Instagram username and password. This will create a file named after your username (e.g., `your_insta_user`) in the project directory. This is the file you will upload to the web app.
+```bash
+instaloader --login=YOUR_INSTAGRAM_USERNAME
+```
 
-### Step 2: Set Up Environment Variables (for deployment)
+Enter your password when prompted. This will create a file named after your username (e.g., `your_instagram_username`) in your current directory. This is the file you will upload to the web app.
 
-If deploying to a service like Render, you will need to set your Google API Key.
+### Step 2: Set Up Environment Variables
 
-1.  Create a `.env` file for local use: `cp .env.example .env` and add your key.
-2.  For Render, go to "Environment" and add a new environment variable:
-    *   **Key**: `GOOGLE_API_KEY`
-    *   **Value**: `your_google_api_key_here` (Get one from [Google AI Studio](https://aistudio.google.com/app/apikey))
+You need API keys for both Google and Meta (Facebook).
 
-### Step 3: Run the Application
+1.  Create a `.env` file for local use: `cp .env.example .env`.
+2.  Add your keys to the file:
+    *   `GOOGLE_API_KEY`: Get one from [Google AI Studio](https://aistudio.google.com/app/apikey).
+    *   `META_GRAPH_API_TOKEN`: This is a User Access Token from a Facebook App with the necessary permissions (`instagram_manage_comments`). See [Meta's documentation](https://developers.facebook.com/docs/graph-api/overview) for how to get this.
 
-1.  Run locally with `flask run`.
-2.  Open the web page, fill in the fields, and select your session file in the file upload input.
-3.  Click "Fetch & Generate Suggestions".
+### Step 3: Run or Deploy
+
+*   **Local Use**: Run `flask run` and open the app in your browser.
+*   **Deployment on Render.com**:
+    1.  Deploy your repository.
+    2.  Set the build command: `pip install -r requirements.txt`.
+    3.  Set the start command: `gunicorn main:app`.
+    4.  In the "Environment" tab, add your `GOOGLE_API_KEY` and `META_GRAPH_API_TOKEN` as environment variables.
