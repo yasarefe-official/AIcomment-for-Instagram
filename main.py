@@ -16,8 +16,6 @@ def generate_reply_with_google_api(system_prompt, comment_text):
         'X-goog-api-key': api_key
     }
 
-    # Google API'sinin beklediği format ile prompt'u birleştiriyoruz.
-    # Sistemin rolünü ve kullanıcı girdisini ayrı ayrı belirtmek genellikle daha iyi sonuç verir.
     prompt_text = f"{system_prompt}\n###\nComment: \"{comment_text}\"\n###\nReply:"
 
     data = {
@@ -36,17 +34,13 @@ def generate_reply_with_google_api(system_prompt, comment_text):
     }
 
     response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status() # Hata durumunda exception fırlat
+    response.raise_for_status()
 
-    # API cevabından metni ayıkla
-    # Cevap formatı: response.json()['candidates'][0]['content']['parts'][0]['text']
     try:
         return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
     except (KeyError, IndexError) as e:
-        # API'den beklenen format gelmezse, hatayı logla veya bir varsayılan döndür
         print(f"Error parsing Google API response: {e}")
         return "Sorry, I couldn't generate a reply."
-
 
 @app.route('/')
 def index():
@@ -56,16 +50,21 @@ def index():
 def process_video():
     data = request.json
     username = data.get('username')
-    password = data.get('password')
     shortcode = data.get('shortcode')
     system_prompt = data.get('system_prompt')
 
-    if not all([username, password, shortcode, system_prompt]):
-        return jsonify({'error': 'All fields are required.'}), 400
+    if not all([username, shortcode, system_prompt]):
+        return jsonify({'error': 'Username, shortcode, and system prompt are required.'}), 400
 
     try:
         L = instaloader.Instaloader()
-        L.login(username, password)
+
+        # Checkpoint sorununu önlemek için şifreyle giriş yapmak yerine session dosyasını kullan
+        session_file = f"./{username}"
+        if not os.path.exists(session_file):
+            return jsonify({'error': f'Session file not found for user {username}. Please create it first.'}), 400
+
+        L.load_session_from_file(username, session_file)
 
         post = instaloader.Post.from_shortcode(L.context, shortcode)
         comments = list(post.get_comments())
