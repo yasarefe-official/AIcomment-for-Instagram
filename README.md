@@ -1,15 +1,15 @@
-# Instagram AI Comment Suggester (Session-Based)
+# Instagram AI Comment Suggester (Secure Session Upload)
 
-This is a lightweight Flask-based web application that uses a pre-saved `instaloader` session to fetch comments from a video post and then generates reply suggestions using the Google Generative Language API.
+This is a lightweight Flask-based web application that uses a user-uploaded `instaloader` session to fetch comments from a video post and then generates reply suggestions using the Google Generative Language API.
 
-This version avoids `instaloader` checkpoint errors by using a session file instead of logging in with a password directly in the app.
+This version uses a secure method where the session file is uploaded directly through the browser and is never stored permanently on the server or in a git repository.
 
 ## How it works
 
-1.  **Create Session (One-time setup):** The user runs a local script (`create_session.py`) to log in to Instagram and create a session file. This file securely stores the login state.
-2.  **User Input**: In the web app, the user provides their Instagram username (so the app can find the correct session file), the shortcode of the video post, and a system prompt for the AI.
-3.  **Load Session & Fetch**: The application uses `instaloader` to load the pre-saved session and fetches all comments from the specified video.
-4.  **Generate AI Suggestions**: For each comment, a request is sent to the Google Generative Language API to generate a reply suggestion.
+1.  **Create Session (One-time setup on your computer):** The user runs a local script (`create_session.py`) to log in to Instagram. This creates a session file on their computer.
+2.  **Upload Session & Provide Info**: In the web app, the user provides their Instagram username, the video shortcode, a system prompt for the AI, and uploads the session file created in the first step.
+3.  **Load Session & Fetch**: The application backend receives the session file, loads it into `instaloader`, and immediately fetches the comments. The session file is deleted from the server right after use.
+4.  **Generate AI Suggestions**: For each comment, a request is sent to the Google Generative Language API.
 5.  **Display Results**: The web UI lists each comment along with its AI-generated reply suggestion.
 
 ## How to Use
@@ -31,24 +31,19 @@ You must do this once on your local machine.
     ```bash
     python create_session.py
     ```
-    Enter your Instagram username and password when prompted. This will create a file named after your username (e.g., `your_insta_user`) in the project directory. This is your session file.
+    Enter your Instagram username and password. This will create a file named after your username (e.g., `your_insta_user`) in the project directory. This is the file you will upload to the web app.
 
-### Step 2: Set Up Environment Variables
+### Step 2: Set Up Environment Variables (for deployment)
 
-1.  Create a `.env` file by copying the example file:
-    ```bash
-    cp .env.example .env
-    ```
-2.  Open the `.env` file and add your Google API Key. You can get one from the [Google AI Studio](https://aistudio.google.com/app/apikey).
-    ```
-    GOOGLE_API_KEY=your_google_api_key_here
-    ```
+If deploying to a service like Render, you will need to set your Google API Key.
+
+1.  Create a `.env` file for local use: `cp .env.example .env` and add your key.
+2.  For Render, go to "Environment" and add a new environment variable:
+    *   **Key**: `GOOGLE_API_KEY`
+    *   **Value**: `your_google_api_key_here` (Get one from [Google AI Studio](https://aistudio.google.com/app/apikey))
 
 ### Step 3: Run the Application
 
-*   **Local Use**: Run `flask run`. The app will use the session file you created.
-*   **Deployment on Render.com**:
-    1.  Deploy your repository to Render.
-    2.  **Important:** You must upload your generated session file to the root of your project on Render. You might need to use a different deployment method or include the session file in your git repository if you want to use it on Render. **Be aware of the security risk of committing session files to git.**
-    3.  Set the build command to `pip install -r requirements.txt` and the start command to `gunicorn main:app`.
-    4.  Add your `GOOGLE_API_KEY` as an environment variable in the Render dashboard.
+1.  Run locally with `flask run`.
+2.  Open the web page, fill in the fields, and select your session file in the file upload input.
+3.  Click "Fetch & Generate Suggestions".
