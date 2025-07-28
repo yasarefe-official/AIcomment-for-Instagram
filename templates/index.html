@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram AI Comment Suggester</title>
+    <title>Instagram AI Comment Replier</title>
     <style>
         body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
         .container { max-width: 800px; margin: auto; }
-        input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
+        input { width: 100%; padding: 8px; margin-bottom: 10px; }
         button { padding: 10px 15px; cursor: pointer; }
         .comment-item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-        .reply { background-color: #f0f8ff; padding: 5px; margin-top: 5px; border-left: 3px solid #add8e6; }
+        .reply { background-color: #f0f8ff; padding: 10px; margin-top: 5px; border-left: 3px solid #add8e6; }
+        .status { margin-left: 10px; font-style: italic; }
         .info { background-color: #eee; padding: 10px; margin-bottom: 15px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Instagram AI Comment Suggester</h1>
+        <h1>Instagram AI Comment Replier</h1>
         <div class="info">
             <p><strong>How to use:</strong></p>
             <ol>
-                <li>Run the `create_session.py` script on your computer to generate a session file.</li>
-                <li>Upload that session file below.</li>
+                <li>Create a session file by running `instaloader --login=YOUR_USERNAME` on your computer.</li>
+                <li>Upload that session file (named after your username) below.</li>
             </ol>
         </div>
         <form id="process-form">
@@ -34,10 +35,7 @@
             <label for="shortcode">Instagram Video Shortcode:</label>
             <input type="text" id="shortcode" name="shortcode" required>
 
-            <label for="system_prompt">System Prompt:</label>
-            <textarea id="system_prompt" name="system_prompt" rows="4" required></textarea>
-
-            <button type="submit" id="fetch-btn">Fetch & Generate Suggestions</button>
+            <button type="submit" id="fetch-btn">Fetch & Generate Replies</button>
         </form>
 
         <div id="results"></div>
@@ -49,40 +47,63 @@
 
             const fetchBtn = document.getElementById('fetch-btn');
             const resultsDiv = document.getElementById('results');
-            const form = e.target;
-
-            const formData = new FormData(form);
+            const formData = new FormData(e.target);
 
             fetchBtn.disabled = true;
             fetchBtn.textContent = 'Processing...';
             resultsDiv.innerHTML = '';
 
-            try {
-                const response = await fetch('/process_video', {
-                    method: 'POST',
-                    body: formData // No 'Content-Type' header needed, browser sets it for FormData
-                });
+            const response = await fetch('/process_video', { method: 'POST', body: formData });
+            const data = await response.json();
 
+            if (data.error) {
+                resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            } else {
+                data.results.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'comment-item';
+                    div.innerHTML = `
+                        <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
+                        <div class="reply">
+                            <strong>Suggested Reply:</strong> <span class="reply-text">${item.suggested_reply}</span>
+                            <br><br>
+                            <button class="reply-btn" data-comment-id="${item.comment_id}">Reply</button>
+                            <span class="status"></span>
+                        </div>
+                    `;
+                    resultsDiv.appendChild(div);
+                });
+            }
+            fetchBtn.disabled = false;
+            fetchBtn.textContent = 'Fetch & Generate Replies';
+        });
+
+        document.getElementById('results').addEventListener('click', async function(e) {
+            if (e.target.classList.contains('reply-btn')) {
+                const button = e.target;
+                const commentId = button.dataset.commentId;
+                const replyText = button.closest('.reply').querySelector('.reply-text').textContent;
+                const statusSpan = button.nextElementSibling;
+
+                button.disabled = true;
+                statusSpan.textContent = 'Sending...';
+
+                const response = await fetch('/reply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment_id: commentId, reply_text: replyText })
+                });
                 const data = await response.json();
 
-                if (data.error) {
-                    resultsDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                if (data.status === 'success') {
+                    statusSpan.textContent = 'Sent!';
+                    statusSpan.style.color = 'green';
                 } else {
-                    data.results.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'comment-item';
-                        div.innerHTML = `
-                            <p><strong>${item.owner}:</strong> ${item.comment_text}</p>
-                            <div class="reply"><strong>Suggested Reply:</strong> ${item.suggested_reply}</div>
-                        `;
-                        resultsDiv.appendChild(div);
-                    });
+                    const errorMessage = data.message?.error?.message || JSON.stringify(data.message);
+                    statusSpan.textContent = `Error: ${errorMessage}`;
+                    statusSpan.style.color = 'red';
+                    button.disabled = false;
                 }
-            } catch (error) {
-                resultsDiv.innerHTML = `<p style="color: red;">An unexpected error occurred: ${error.message}</p>`;
-            } finally {
-                fetchBtn.disabled = false;
-                fetchBtn.textContent = 'Fetch & Generate Suggestions';
             }
         });
     </script>
