@@ -1,13 +1,13 @@
 import os
 import tempfile
-from flask import Flask, render_template, request, jsonify
+import json
+from flask import Flask, render_template, request, Response
 import instaloader
 import requests
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# 1. Sunucu Tarafındaki Sistem Prompt (Ana prompt) - Değiştirilemez
 MAIN_SYSTEM_PROMPT = "You are a helpful social media assistant. Your goal is to generate a friendly and concise reply to the following comment. The reply must be a maximum of 30 words and must adhere to the user's instructions."
 
 def generate_reply_with_google_api(user_system_prompt, comment_text):
@@ -18,16 +18,11 @@ def generate_reply_with_google_api(user_system_prompt, comment_text):
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemma-2b-it:generateContent"
     headers = {'Content-Type': 'application/json', 'X-goog-api-key': api_key}
 
-    # Ana ve Alt prompt'ları birleştir
     final_prompt = (
         f"{MAIN_SYSTEM_PROMPT}\n\n"
         f"User's instructions for tone and style: '{user_system_prompt}'\n\n"
-        f"###\n"
-        f"Comment: \"{comment_text}\"\n"
-        f"###\n"
-        f"Reply:"
+        f"###\nComment: \"{comment_text}\"\n###\nReply:"
     )
-
     data = {
         "contents": [{"parts": [{"text": final_prompt}]}],
         "generationConfig": {"maxOutputTokens": 40}
@@ -48,66 +43,61 @@ def index():
 @app.route('/process_video', methods=['POST'])
 def process_video():
     if 'session_file' not in request.files:
-        return jsonify({'error': 'No session file part.'}), 400
+        return Response("Session file is required.", status=400)
 
+    # Form verilerini ve dosyayı al
     file = request.files['session_file']
     username = request.form.get('username')
     shortcode = request.form.get('shortcode')
-    user_system_prompt = request.form.get('user_system_prompt') # 2. Kullanıcı Tarafındaki Sistem Prompt
+    user_system_prompt = request.form.get('user_system_prompt')
 
     if not all([file, username, shortcode, user_system_prompt]):
-        return jsonify({'error': 'All fields and a session file are required.'}), 400
+        return Response("All fields and a session file are required.", status=400)
 
+    # Dosyayı geçici bir konuma kaydet
     temp_dir = tempfile.gettempdir()
     temp_filepath = os.path.join(temp_dir, secure_filename(file.filename))
     file.save(temp_filepath)
 
-    try:
-        L = instaloader.Instaloader()
-        L.load_session_from_file(username, temp_filepath)
+    def event_stream():
+        try:
+            L = instaloader.Instaloader()
+            L.load_session_from_file(username, temp_filepath)
+            post = instaloader.Post.from_shortcode(L.context, shortcode)
 
-        post = instaloader.Post.from_shortcode(L.context, shortcode)
-        comments = list(post.get_comments())
+            yield f"data: {json.dumps({'type': 'info', 'message': 'Fetching comments...'})}\n\n"
 
-        results = []
-        for comment in comments:
-            reply_text = generate_reply_with_google_api(user_system_prompt, comment.text)
+            comments = list(post.get_comments())
+            total_comments = len(comments)
+            yield f"data: {json.dumps({'type': 'status', 'total_comments': total_comments})}\n\n"
 
-            results.append({
-                'comment_id': comment.id,
-                'comment_text': comment.text,
-                'owner': comment.owner.username,
-                'suggested_reply': reply_text
-            })
+            generated_count = 0
+            for i, comment in enumerate(comments):
+                yield f"data: {json.dumps({'type': 'status', 'comments_fetched': i + 1})}\n\n"
 
-        return jsonify({'results': results})
+                try:
+                    reply_text = generate_reply_with_google_api(user_system_prompt, comment.text)
+                    generated_count += 1
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        if os.path.exists(temp_filepath):
-            os.remove(temp_filepath)
+                    result = {
+                        'comment_text': comment.text,
+                        'owner': comment.owner.username,
+                        'suggested_reply': reply_text
+                    }
+                    yield f"data: {json.dumps({'type': 'new_reply', 'data': result, 'replies_generated': generated_count})}\n\n"
 
-@app.route('/reply', methods=['POST'])
-def reply():
-    data = request.json
-    comment_id = data.get('comment_id')
-    reply_text = data.get('reply_text')
-    access_token = os.getenv('META_GRAPH_API_TOKEN')
+                except Exception as api_error:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Could not process comment by {comment.owner.username}: {api_error}'})}\n\n"
 
-    if not all([comment_id, reply_text, access_token]):
-        return jsonify({'error': 'Comment ID, reply text, and Meta API token are required.'}), 400
+            yield f"data: {json.dumps({'type': 'done', 'message': 'Processing complete.'})}\n\n"
 
-    url = f"https://graph.facebook.com/v20.0/{comment_id}/replies"
-    params = {'message': reply_text, 'access_token': access_token}
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            if os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
 
-    try:
-        response = requests.post(url, params=params)
-        response.raise_for_status()
-        return jsonify({'status': 'success', 'message': 'Reply sent successfully.'})
-    except requests.exceptions.RequestException as e:
-        error_info = e.response.json() if e.response else str(e)
-        return jsonify({'status': 'error', 'message': error_info}), 500
+    return Response(event_stream(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
